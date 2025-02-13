@@ -2,6 +2,7 @@ import Foundation
 import whisper_cpp
 
 @available(iOS 13.0, *)
+@MainActor
 public class Whisper: ObservableObject {
     private let whisperContext: OpaquePointer
     private var unmanagedSelf: Unmanaged<Whisper>?
@@ -128,49 +129,43 @@ public class Whisper: ObservableObject {
         inProgress = true
         frameCount = audioFrames.count
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            whisper_full(self.whisperContext, self.params.whisperParams, audioFrames, Int32(audioFrames.count))
+        whisper_full(self.whisperContext, self.params.whisperParams, audioFrames, Int32(audioFrames.count))
 
-            let segmentCount = whisper_full_n_segments(self.whisperContext)
+        let segmentCount = whisper_full_n_segments(self.whisperContext)
 
-            var segments: [Segment] = []
-            segments.reserveCapacity(Int(segmentCount))
+        var segments: [Segment] = []
+        segments.reserveCapacity(Int(segmentCount))
 
-            for index in 0..<segmentCount {
-                guard let text = whisper_full_get_segment_text(self.whisperContext, index) else { continue }
-                let startTime = whisper_full_get_segment_t0(self.whisperContext, index)
-                let endTime = whisper_full_get_segment_t1(self.whisperContext, index)
+        for index in 0..<segmentCount {
+            guard let text = whisper_full_get_segment_text(self.whisperContext, index) else { continue }
+            let startTime = whisper_full_get_segment_t0(self.whisperContext, index)
+            let endTime = whisper_full_get_segment_t1(self.whisperContext, index)
 
-                segments.append(
-                    .init(
-                        startTime: Int(startTime) * 10, // Correct for ms/10
-                        endTime: Int(endTime) * 10,
-                        text: String(Substring(cString: text))
-                    )
+            segments.append(
+                .init(
+                    startTime: Int(startTime) * 10, // Correct for ms/10
+                    endTime: Int(endTime) * 10,
+                    text: String(Substring(cString: text))
                 )
-            }
-
-            if let cancelCallback = self.cancelCallback {
-                DispatchQueue.main.async {
-                    // Should cancel callback be called after delegate and completionHandler?
-                    cancelCallback()
-
-                    let error = WhisperError.cancelled
-
-                    self.delegate?.whisper(self, didErrorWith: error)
-                    wrappedCompletionHandler(.failure(error))
-                }
-            } else {
-                DispatchQueue.main.async {
-                    self.delegate?.whisper(self, didCompleteWithSegments: segments)
-                    wrappedCompletionHandler(.success(segments))
-                }
-            }
-
-            self.frameCount = nil
-            self.cancelCallback = nil
-            self.inProgress = false
+            )
         }
+
+        if let cancelCallback = self.cancelCallback {
+            // Should cancel callback be called after delegate and completionHandler?
+            cancelCallback()
+
+            let error = WhisperError.cancelled
+
+            self.delegate?.whisper(self, didErrorWith: error)
+            wrappedCompletionHandler(.failure(error))
+        } else {
+            self.delegate?.whisper(self, didCompleteWithSegments: segments)
+            wrappedCompletionHandler(.success(segments))
+        }
+
+        self.frameCount = nil
+        self.cancelCallback = nil
+        self.inProgress = false
     }
 
     public func cancel(completionHandler: @escaping () -> Void) throws {
