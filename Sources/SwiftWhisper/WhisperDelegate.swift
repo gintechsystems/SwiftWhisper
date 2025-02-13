@@ -1,5 +1,6 @@
 import Foundation
 
+@available(iOS 13.0, *)
 public protocol WhisperDelegate: AnyObject {
     func whisper(_ aWhisper: Whisper, didUpdateProgress progress: Double)
     func whisper(_ aWhisper: Whisper, didProcessNewSegments segments: [Segment], atIndex index: Int)
@@ -7,6 +8,7 @@ public protocol WhisperDelegate: AnyObject {
     func whisper(_ aWhisper: Whisper, didErrorWith error: Error)
 }
 
+@available(iOS 13.0, *)
 public extension WhisperDelegate {
     func whisper(_ aWhisper: Whisper, didUpdateProgress progress: Double) {
         //

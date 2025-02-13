@@ -1,7 +1,8 @@
 import Foundation
 import whisper_cpp
 
-public class Whisper {
+@available(iOS 13.0, *)
+public class Whisper: ObservableObject {
     private let whisperContext: OpaquePointer
     private var unmanagedSelf: Unmanaged<Whisper>?
 
@@ -101,6 +102,10 @@ public class Whisper {
 
         unmanagedSelf.release()
         self.unmanagedSelf = nil
+    }
+    
+    public func getLanguage() -> String {
+        return String(cString: whisper_lang_str(whisper_full_lang_id(whisperContext)))
     }
 
     public func transcribe(audioFrames: [Float], completionHandler: @escaping (Result<[Segment], Error>) -> Void) {
